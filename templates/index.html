@@ -811,6 +811,12 @@ code {
 
         <div id="bulk-status" style="font-size:0.83rem;color:var(--muted);min-height:20px;"></div>
 
+        <!-- Year filter -->
+        <div id="bulk-year-row" class="hidden" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span style="font-size:0.68rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);flex-shrink:0;">Year</span>
+          <div id="bulk-year-filter-btns" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
+        </div>
+
         <!-- Theme picker -->
         <div id="bulk-theme-row" class="hidden" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
           <span style="font-size:0.8rem;font-weight:700;color:var(--primary);">Theme:</span>
@@ -1894,6 +1900,7 @@ let _bulkNextPageToken = null;
 let _bulkRunning = false;
 let _bulkCancelled = false;
 let _bulkTheme = 'navy_gold';
+let _bulkActiveYear = '';
 
 async function bulkLoadPosts() {
   const url = document.getElementById('bulk-blog-url').value.trim();
@@ -1910,10 +1917,13 @@ async function bulkLoadPosts() {
     const blog = await (await fetch('/blogger/blog?url=' + encodeURIComponent(url))).json();
     if (blog.error) { status.textContent = 'Error: ' + blog.error; return; }
     _bulkBlogId = blog.id;
+    _bulkActiveYear = '';
     status.textContent = `Loading posts from "${blog.name}"…`;
     await _bulkFetchPage();
+    _bulkBuildYearFilter();
     _bulkRenderThemes();
     _bulkRenderPosts();
+    document.getElementById('bulk-year-row').classList.remove('hidden');
     document.getElementById('bulk-theme-row').classList.remove('hidden');
     document.getElementById('bulk-post-section').classList.remove('hidden');
     status.textContent = 'Checking formatting status…';
@@ -1927,6 +1937,7 @@ async function bulkLoadPosts() {
 async function _bulkFetchPage() {
   let qs = '/blogger/posts?blog_id=' + _bulkBlogId + '&max=50';
   if (_bulkNextPageToken) qs += '&page_token=' + encodeURIComponent(_bulkNextPageToken);
+  if (_bulkActiveYear) qs += '&year=' + _bulkActiveYear;
   const data = await (await fetch(qs)).json();
   if (data.error) throw new Error(data.error);
   _bulkAllPosts = _bulkAllPosts.concat(data.posts || []);
@@ -1944,6 +1955,48 @@ async function bulkLoadMore() {
   document.getElementById('bulk-status').textContent = 'Checking formatting status…';
   await _bulkCheckThemes(newPosts);
   document.getElementById('bulk-status').textContent = '';
+}
+
+function _bulkBuildYearFilter() {
+  const wrap = document.getElementById('bulk-year-filter-btns');
+  wrap.innerHTML = '';
+  const currentYear = new Date().getFullYear();
+  const years = ['All'];
+  for (let y = currentYear; y >= 2014; y--) years.push(String(y));
+  years.forEach(y => {
+    const isAll = y === 'All';
+    const active = isAll ? _bulkActiveYear === '' : _bulkActiveYear === y;
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-sm';
+    btn.textContent = y;
+    btn.style.cssText = active
+      ? 'background:var(--primary);color:white;border:1px solid var(--primary);'
+      : 'background:var(--warm);border:1px solid var(--border);color:var(--primary);';
+    btn.onclick = () => {
+      _bulkActiveYear = isAll ? '' : y;
+      _bulkBuildYearFilter();
+      _bulkReloadPosts();
+    };
+    wrap.appendChild(btn);
+  });
+}
+
+async function _bulkReloadPosts() {
+  _bulkAllPosts = [];
+  _bulkNextPageToken = null;
+  document.getElementById('bulk-done').classList.add('hidden');
+  const status = document.getElementById('bulk-status');
+  status.textContent = 'Loading…';
+  try {
+    await _bulkFetchPage();
+    _bulkRenderPosts();
+    document.getElementById('bulk-post-section').classList.remove('hidden');
+    status.textContent = 'Checking formatting status…';
+    await _bulkCheckThemes(_bulkAllPosts);
+    status.textContent = '';
+  } catch(e) {
+    status.textContent = 'Error: ' + e.message;
+  }
 }
 
 function _bulkRenderThemes() {

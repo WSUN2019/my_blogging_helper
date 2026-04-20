@@ -661,30 +661,7 @@ def blogger_cleanup_scan():
         return jsonify({'error': str(e)}), 400
 
 
-_BT_MARKER_RE = re.compile(r'<!--\s*bt:(\w+)\s*-->', re.IGNORECASE)
 
-
-@app.route('/blogger/bulk/check-themes', methods=['POST'])
-@login_required
-def blogger_bulk_check_themes():
-    """Return the bt: theme marker for each post id, or null if not formatted."""
-    svc = _get_service()
-    if not svc:
-        return jsonify({'error': 'Not authenticated'}), 401
-    data = request.get_json() or {}
-    blog_id = data.get('blog_id', '')
-    post_ids = data.get('post_ids', [])
-    if not blog_id or not post_ids:
-        return jsonify({'error': 'blog_id and post_ids required'}), 400
-    results = {}
-    for post_id in post_ids:
-        try:
-            p = svc.posts().get(blogId=blog_id, postId=post_id).execute()
-            m = _BT_MARKER_RE.search(p.get('content', ''))
-            results[post_id] = m.group(1) if m else None
-        except Exception:
-            results[post_id] = None
-    return jsonify({'themes': results})
 
 
 @app.route('/blogger/bulk/reformat-one', methods=['POST'])
@@ -710,10 +687,19 @@ def blogger_bulk_reformat_one():
         plain = _html_to_plain(original_html)
         plain = _auto_inject_title(plain)
 
+        import time as _time
         model_id = _get_gemini_model()
         from google import genai
         client = genai.Client(api_key=api_key)
-        response = client.models.generate_content(model=model_id, contents=GEMINI_PROMPT + plain)
+        for _attempt in range(3):
+            try:
+                response = client.models.generate_content(model=model_id, contents=GEMINI_PROMPT + plain)
+                break
+            except Exception as _ge:
+                if '429' in str(_ge) and _attempt < 2:
+                    _time.sleep(15 * (_attempt + 1))
+                else:
+                    raise
         structured = response.text.strip()
         if structured.startswith('```'):
             lines = structured.splitlines()

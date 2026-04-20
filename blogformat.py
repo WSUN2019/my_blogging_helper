@@ -439,13 +439,6 @@ def inline_format(text: str, theme: Theme) -> str:
 def render(post: Post, theme: Theme) -> str:
     out = []
 
-    # Google Fonts link at the very top
-    out.append(
-        '<link href="https://fonts.googleapis.com/css2?'
-        'family=Playfair+Display:ital,wght@0,400;0,700;1,400&'
-        'family=Lato:wght@300;400;700&display=swap" rel="stylesheet">'
-    )
-
     # ---- Header ----
     out.append(render_header(post, theme))
 

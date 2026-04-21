@@ -588,7 +588,10 @@ code {
           <div class="card" style="padding:14px 18px;">
             <div class="flex gap-2" style="align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;">
               <h3 id="post-editor-title" style="font-family:'Playfair Display',serif;color:var(--primary);font-size:1.1rem;flex:1;line-height:1.3;"></h3>
-              <a id="post-view-link" href="#" target="_blank" class="btn btn-outline btn-sm" style="flex-shrink:0;">View ↗</a>
+              <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+                <span id="version-status-badge" style="display:none;font-size:0.72rem;font-weight:700;letter-spacing:0.08em;padding:3px 10px;border-radius:12px;white-space:nowrap;"></span>
+                <a id="post-view-link" href="#" target="_blank" class="btn btn-outline btn-sm">View ↗</a>
+              </div>
             </div>
             <div id="post-labels-row" class="hidden" style="margin-top:8px;"></div>
           </div>
@@ -601,8 +604,18 @@ code {
               <button class="btn btn-outline btn-sm" onclick="sendToFormatter()">◑ Format with Theme</button>
               <button class="btn btn-outline btn-sm btn-icon" onclick="toggleGeminiSettings()" title="Gemini API key &amp; model settings">⚙</button>
               <div class="spacer"></div>
+              <button class="btn btn-outline btn-sm" onclick="saveVersion(this)" title="Save a local backup of the current HTML to blog_backup/versions/">💾 Save Version</button>
               <button class="btn btn-accent btn-sm" onclick="savePost(this)">↑ Save to Blogger</button>
             </div>
+          </div>
+
+          <!-- Versions panel -->
+          <div id="versions-panel" class="card hidden" style="padding:12px 16px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+              <span style="font-size:0.72rem;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);">Saved Versions <span id="versions-count" style="font-weight:400;"></span></span>
+              <button class="btn btn-outline btn-sm" onclick="document.getElementById('versions-panel').classList.add('hidden')" style="padding:2px 9px;">✕</button>
+            </div>
+            <div id="versions-list" style="display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto;"></div>
           </div>
 
           <!-- Post HTML -->
@@ -611,7 +624,7 @@ code {
               <label style="margin:0;">Post HTML Content</label>
               <button class="btn btn-outline btn-sm" onclick="copyText('post-html', this)">⧉ Copy</button>
             </div>
-            <textarea id="post-html" rows="14" oninput="refreshPostPreview()"></textarea>
+            <textarea id="post-html" rows="14" oninput="refreshPostPreview(); updateVersionBadge();"></textarea>
           </div>
 
           <!-- Post Preview -->
@@ -980,11 +993,19 @@ code {
 ───────────────────────────────────────────── -->
 <div id="tab-feed" class="tab-pane">
   <h1 class="page-title">Backup Reviewer</h1>
-  <p class="page-desc">Read your <code>blog_backup/feed.atom</code> file — the XML backup exported from Blogger.com. Browse all posts, preview their content, and copy the raw HTML to paste back into Blogger or anywhere else.</p>
+  <p class="page-desc">Browse your <code>blog_backup/feed.atom</code> — the XML backup exported from Blogger.com. Preview posts and copy raw HTML. Upload a new file anytime to replace it.</p>
+
+  <div style="margin-bottom:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+    <label class="btn btn-outline btn-sm" style="cursor:pointer;margin:0;">
+      ↑ Upload feed.atom
+      <input type="file" accept=".atom,.xml" style="display:none;" onchange="feedUpload(this)">
+    </label>
+    <span id="feed-upload-status" style="font-size:0.8rem;color:var(--muted);"></span>
+  </div>
 
   <div id="feed-loading" class="text-muted" style="margin-top:24px;">Loading feed…</div>
-  <div id="feed-no-file" class="alert alert-error hidden">
-    <strong>feed.atom not found.</strong> Make sure <code>blog_backup/feed.atom</code> exists in the project folder.
+  <div id="feed-no-file" class="alert alert-info hidden">
+    No <code>feed.atom</code> found. Export your blog from Blogger.com (Settings → Back up content) then upload it above.
   </div>
 
   <div id="feed-ready" class="hidden">
@@ -1064,159 +1085,72 @@ code {
      TAB 5 · ABOUT
 ───────────────────────────────────────────── -->
 <div id="tab-about" class="tab-pane">
-  <div style="max-width:780px;margin:0 auto;">
+  <div style="max-width:700px;">
 
-    <!-- Hero -->
-    <div style="background:var(--primary);border-radius:10px;padding:36px 40px;margin-bottom:24px;color:white;">
-      <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">
-        <div style="width:52px;height:52px;background:var(--accent);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-          <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
-            <path d="M12 5C10 3.5 7 3 4 3.5V17.5C7 17 10 17.5 12 19V5Z" fill="#1a2640"/>
-            <path d="M12 5C14 3.5 17 3 20 3.5V17.5C17 17 14 17.5 12 19V5Z" fill="#1a2640" opacity="0.65"/>
-            <line x1="12" y1="5" x2="12" y2="19" stroke="#c9a84c" stroke-width="1.5" stroke-linecap="round"/>
-            <path d="M19 1l.5 1.5L21 3l-1.5.5L19 5l-.5-1.5L17 3l1.5-.5Z" fill="#c9a84c"/>
-            <path d="M7 9.5C7 8.7 7.7 8 8.5 8S10 8.7 10 9.5C10 11 8.5 12 8.5 12S7 11 7 9.5Z" fill="#c9a84c" opacity="0.85"/>
-          </svg>
-        </div>
-        <div>
-          <div style="font-size:0.72rem;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:var(--accent);margin-bottom:4px;">Personal Blog Management</div>
-          <h1 style="font-family:'Playfair Display',serif;font-size:2rem;font-weight:700;line-height:1.2;">My Blogging Helper</h1>
-        </div>
-      </div>
-      <p style="font-size:0.95rem;color:rgba(255,255,255,0.75);line-height:1.6;max-width:560px;">A private web app for writing, formatting, and managing posts on Blogger.com — with AI smart formatting, bulk editing tools, and direct API access to your blog.</p>
-      <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:22px;">
-        <span style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:20px;padding:5px 14px;font-size:0.78rem;color:rgba(255,255,255,0.7);">Created April 18, 2026</span>
-        <span style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:20px;padding:5px 14px;font-size:0.78rem;color:rgba(255,255,255,0.7);">Built with VS Code &amp; Claude Code</span>
-        <span style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:20px;padding:5px 14px;font-size:0.78rem;color:rgba(255,255,255,0.7);">Python · Flask · Google APIs</span>
-      </div>
+    <h1 class="page-title">About</h1>
+    <p class="page-desc">A private local tool for writing, formatting, and managing posts on Blogger.com. Built with VS Code and Claude Code.</p>
+
+    <!-- Features table -->
+    <div class="card" style="margin-bottom:18px;">
+      <table style="width:100%;border-collapse:collapse;font-size:0.84rem;line-height:1.55;">
+        <tbody>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:9px 12px;font-weight:700;color:var(--primary);white-space:nowrap;">Blog Editor</td>
+            <td style="padding:9px 12px;color:var(--body-text);">OAuth to Blogger API v3. Browse posts by year, load HTML, reformat with AI + images, save versions locally, push back live.</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:9px 12px;font-weight:700;color:var(--primary);white-space:nowrap;">Blog Formatter</td>
+            <td style="padding:9px 12px;color:var(--body-text);">Plain text → styled Blogger HTML. 7 themes. Smart Format uses Gemini AI to auto-structure sections, stats, lists and tables.</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:9px 12px;font-weight:700;color:var(--primary);white-space:nowrap;">Image Cleaner</td>
+            <td style="padding:9px 12px;color:var(--body-text);">Extracts <code>&lt;a&gt;&lt;img&gt;</code> blocks from Blogger HTML, strips float/margin styles, previews thumbnails.</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:9px 12px;font-weight:700;color:var(--primary);white-space:nowrap;">Bulk Operations</td>
+            <td style="padding:9px 12px;color:var(--body-text);">Link Cleanup (remove stray tags across all posts) and Bulk Reformat + Images (AI reformat up to 10 at a time).</td>
+          </tr>
+          <tr>
+            <td style="padding:9px 12px;font-weight:700;color:var(--primary);white-space:nowrap;">Backup Reviewer</td>
+            <td style="padding:9px 12px;color:var(--body-text);">Upload and browse your <code>feed.atom</code> Blogger export. Filter by year or label, preview posts, copy HTML.</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
-    <!-- Nav overview -->
-    <div style="font-family:'Playfair Display',serif;font-size:1.05rem;font-weight:700;color:var(--primary);margin-bottom:14px;">How It's Organised</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:24px;">
-      <div class="card" style="text-align:center;padding:20px 14px;">
-        <div style="font-size:1.6rem;margin-bottom:8px;">📝</div>
-        <div style="font-weight:700;color:var(--primary);margin-bottom:6px;">Blog Editor</div>
-        <p style="font-size:0.8rem;color:var(--muted);line-height:1.5;">Connect to Blogger via OAuth. Browse, edit, and push posts back live. Filter by year, one-click AI reformat.</p>
-      </div>
-      <div class="card" style="text-align:center;padding:20px 14px;">
-        <div style="font-size:1.6rem;margin-bottom:8px;">🛠️</div>
-        <div style="font-weight:700;color:var(--primary);margin-bottom:6px;">Utilities</div>
-        <p style="font-size:0.8rem;color:var(--muted);line-height:1.5;">Single Post tools (Blog Formatter, Image Cleaner) and Bulk Operations (Link Cleanup, Bulk Reformat) in one tab.</p>
-      </div>
-      <div class="card" style="text-align:center;padding:20px 14px;">
-        <div style="font-size:1.6rem;margin-bottom:8px;">ℹ️</div>
-        <div style="font-weight:700;color:var(--primary);margin-bottom:6px;">About</div>
-        <p style="font-size:0.8rem;color:var(--muted);line-height:1.5;">This page — feature overview, input syntax reference, and build info.</p>
-      </div>
-    </div>
-
-    <!-- Tools grid -->
-    <div style="font-family:'Playfair Display',serif;font-size:1.05rem;font-weight:700;color:var(--primary);margin-bottom:14px;">Features</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">
-
-      <div class="card">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-          <div style="width:32px;height:32px;background:var(--accent);border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">✍️</div>
-          <div style="font-family:'Playfair Display',serif;font-size:1rem;color:var(--primary);font-weight:700;">Blog Formatter</div>
-        </div>
-        <p style="font-size:0.84rem;color:var(--body-text);line-height:1.6;margin-bottom:8px;">Paste plain text or markdown → get fully-styled inline-CSS Blogger HTML. 7 color themes. Smart Format uses Gemini AI to auto-structure sections, KPI stats, lists and tables.</p>
-        <div style="font-size:0.75rem;color:var(--muted);">Utilities → Single Post</div>
-      </div>
-
-      <div class="card">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-          <div style="width:32px;height:32px;background:var(--accent);border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">🖼️</div>
-          <div style="font-family:'Playfair Display',serif;font-size:1rem;color:var(--primary);font-weight:700;">Image Cleaner</div>
-        </div>
-        <p style="font-size:0.84rem;color:var(--body-text);line-height:1.6;margin-bottom:8px;">Paste any Blogger HTML → extracts all <code>&lt;a&gt;&lt;img&gt;</code> blocks, strips <code>float:left</code> and margin styles, previews thumbnails, and copies clean HTML.</p>
-        <div style="font-size:0.75rem;color:var(--muted);">Utilities → Single Post</div>
-      </div>
-
-      <div class="card">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-          <div style="width:32px;height:32px;background:var(--accent);border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">📝</div>
-          <div style="font-family:'Playfair Display',serif;font-size:1rem;color:var(--primary);font-weight:700;">Blog Editor</div>
-        </div>
-        <p style="font-size:0.84rem;color:var(--body-text);line-height:1.6;margin-bottom:8px;">OAuth connection to Blogger API v3. Browse posts by year, load HTML, one-click <strong>⚡ Reformat + Images</strong>, live preview, and save back. Labels/tags preserved on save.</p>
-        <div style="font-size:0.75rem;color:var(--muted);">Blog Editor tab</div>
-      </div>
-
-      <div class="card">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-          <div style="width:32px;height:32px;background:var(--accent);border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">🔗</div>
-          <div style="font-family:'Playfair Display',serif;font-size:1rem;color:var(--primary);font-weight:700;">Link Cleanup</div>
-        </div>
-        <p style="font-size:0.84rem;color:var(--body-text);line-height:1.6;margin-bottom:8px;">Scans every post and removes stray tags (editable — defaults to the old Google Fonts <code>&lt;link&gt;</code>). Processes one post per 1.5 s to stay under API limits. Fix Next 25 or Fix All with cancel.</p>
-        <div style="font-size:0.75rem;color:var(--muted);">Utilities → Bulk Operations</div>
-      </div>
-
-      <div class="card">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-          <div style="width:32px;height:32px;background:var(--accent);border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">✨</div>
-          <div style="font-family:'Playfair Display',serif;font-size:1rem;color:var(--primary);font-weight:700;">Bulk Reformat + Images</div>
-        </div>
-        <p style="font-size:0.84rem;color:var(--body-text);line-height:1.6;margin-bottom:8px;">Select posts with checkboxes → AI reformats + extracts images → pushes back 10 at a time. Icons show ✅ already done / 🔄 different theme / ○ not yet formatted. Cancel at any time.</p>
-        <div style="font-size:0.75rem;color:var(--muted);">Utilities → Bulk Operations</div>
-      </div>
-
-      <div class="card">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-          <div style="width:32px;height:32px;background:var(--accent);border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1a2640" stroke-width="2.5"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg>
-          </div>
-          <div style="font-family:'Playfair Display',serif;font-size:1rem;color:var(--primary);font-weight:700;">Gemini AI</div>
-        </div>
-        <p style="font-size:0.84rem;color:var(--body-text);line-height:1.6;margin-bottom:8px;">Pick from Gemini 2.5 Flash, 2.5 Flash Lite, 3 Flash (preview), or 3.1 Flash Lite via the ⚙ panel. Each model has its own daily quota — switch if you hit a limit. Key saved locally.</p>
-        <div style="font-size:0.75rem;color:var(--muted);">⚙ settings panel — available on Blog Editor and Utilities</div>
-      </div>
-
-    </div>
-
-    <!-- Input format reference -->
-    <div class="card" style="margin-bottom:24px;">
-      <div style="font-family:'Playfair Display',serif;font-size:1.05rem;color:var(--primary);font-weight:700;margin-bottom:12px;">Formatter Input Syntax</div>
-      <p style="font-size:0.84rem;color:var(--muted);margin-bottom:14px;">Smart Format handles this automatically. Handy to know for manual posts or to review AI output.</p>
-      <pre style="background:var(--warm);border:1px solid var(--border);border-radius:6px;padding:16px;font-size:0.8rem;line-height:1.7;overflow-x:auto;color:var(--body-text);white-space:pre-wrap;">TITLE: My Post Title
+    <!-- Formatter syntax -->
+    <div class="card" style="margin-bottom:18px;">
+      <div style="font-size:0.72rem;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">Formatter Input Syntax</div>
+      <pre style="background:var(--warm);border:1px solid var(--border);border-radius:5px;padding:14px;font-size:0.79rem;line-height:1.7;overflow-x:auto;color:var(--body-text);white-space:pre-wrap;margin:0;">TITLE: My Post Title
 SUBTITLE: Optional italic subtitle
 EYEBROW: Travel Journal
 STATS: 13 Days | ~1,400 Miles | 4 Cities
 
 # Section Heading
-
-Regular paragraph text here.
-
 ## Sub-label
 
-- <strong>Item Name</strong> — description of the item
+- <strong>Item Name</strong> — description
 
-&gt; Tip or callout text — styled with a gold left border.
+&gt; Callout text
 
-| Column A | Column B |
-|----------|----------|
-| value    | value    |
+| Col A | Col B |
+|-------|-------|
+| val   | val   |
 
 FOOTER: Thanks for reading.</pre>
     </div>
 
     <!-- Built with -->
     <div class="card" style="background:var(--warm);">
-      <div style="font-family:'Playfair Display',serif;font-size:1.05rem;color:var(--primary);font-weight:700;margin-bottom:14px;">Built With</div>
-      <div style="display:flex;flex-wrap:wrap;gap:10px;">
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
         <span class="badge">Python 3 · Flask</span>
-        <span class="badge">BeautifulSoup4</span>
         <span class="badge">Google Gemini API</span>
         <span class="badge">Blogger API v3</span>
-        <span class="badge">Google OAuth2</span>
-        <span class="badge">gunicorn</span>
-        <span class="badge">VS Code</span>
         <span class="badge">Claude Code</span>
       </div>
-      <p style="font-size:0.82rem;color:var(--muted);margin-top:14px;line-height:1.6;">
-        Created <strong>April 18, 2026</strong> · Last updated <strong>April 19, 2026</strong>.<br>
-        Built entirely using <strong>VS Code</strong> with <strong>Claude Code</strong> (Anthropic AI) as the coding assistant.<br>
-        Runs locally on your machine — no data leaves your computer except API calls to Google.<br><br>
-        Source code: <a href="https://github.com/WSUN2019/my_blogging_helper" target="_blank" style="color:var(--primary);font-weight:700;">github.com/WSUN2019/my_blogging_helper</a>
+      <p style="font-size:0.82rem;color:var(--muted);line-height:1.6;margin:0;">
+        Created April 2026 · Runs locally — no data leaves your machine except API calls to Google.<br>
+        Source: <a href="https://github.com/WSUN2019/my_blogging_helper" target="_blank" style="color:var(--primary);font-weight:700;">github.com/WSUN2019/my_blogging_helper</a>
       </p>
     </div>
 
@@ -1236,6 +1170,8 @@ let blogId = null;
 let nextPageToken = null;
 let activePostId = null;
 let activeYear = '';
+let _liveHtml = '';
+let _activeVersionTs = 'live';
 
 // ═══════════════════════════════════════════
 //  TABS
@@ -1611,7 +1547,9 @@ async function loadPost(postId, el) {
   if (data.error) { toast(data.error, 'error'); return; }
   document.getElementById('post-editor-title').textContent = data.title;
   document.getElementById('post-view-link').href = data.url || '#';
-  document.getElementById('post-html').value = data.content || '';
+  _liveHtml = data.content || '';
+  _activeVersionTs = 'live';
+  document.getElementById('post-html').value = _liveHtml;
   document.getElementById('post-editor-title').dataset.labels = JSON.stringify(data.labels || []);
   // Show labels under the title
   const labelBadges = (data.labels || []).map(l =>
@@ -1620,6 +1558,8 @@ async function loadPost(postId, el) {
   document.getElementById('post-labels-row').innerHTML = labelBadges;
   document.getElementById('post-labels-row').classList.toggle('hidden', !data.labels?.length);
   refreshPostPreview();
+  updateVersionBadge();
+  loadVersions(postId);
 }
 
 async function extractFromPost(btn) {
@@ -2300,6 +2240,118 @@ async function bulkRunSelected() {
 }
 
 // ═══════════════════════════════════════════
+//  POST VERSIONS
+// ═══════════════════════════════════════════
+function updateVersionBadge() {
+  const badge = document.getElementById('version-status-badge');
+  if (!badge) return;
+  const current = document.getElementById('post-html').value;
+  badge.style.display = '';
+
+  if (_activeVersionTs !== 'live') {
+    // Showing a saved version
+    const dt = _activeVersionTs.replace('T', ' ').replace('Z', ' UTC');
+    badge.textContent = '📁 Version: ' + dt;
+    badge.style.background = '#ebf4ff';
+    badge.style.color = '#2b6cb0';
+    badge.style.border = '1px solid #bee3f8';
+  } else if (current === _liveHtml) {
+    badge.textContent = '● Live';
+    badge.style.background = '#f0fff4';
+    badge.style.color = '#276749';
+    badge.style.border = '1px solid #9ae6b4';
+  } else {
+    badge.textContent = '● Modified';
+    badge.style.background = '#fffbeb';
+    badge.style.color = '#92400e';
+    badge.style.border = '1px solid #fcd34d';
+  }
+}
+
+async function saveVersion(btn) {
+  if (!activePostId) return;
+  const html = document.getElementById('post-html').value;
+  const title = document.getElementById('post-editor-title').textContent;
+  setBtnLoading(btn, true);
+  try {
+    const r = await post('/versions/save', {post_id: activePostId, title, content: html});
+    toast(`Version saved (${r.count} total)`, 'success');
+    await loadVersions(activePostId);
+  } catch(e) {
+    toast('Save failed: ' + e.message, 'error');
+  } finally {
+    setBtnLoading(btn, false);
+  }
+}
+
+async function loadVersions(postId) {
+  const panel = document.getElementById('versions-panel');
+  const list  = document.getElementById('versions-list');
+  const count = document.getElementById('versions-count');
+  try {
+    const r = await get('/versions/' + postId);
+    panel.classList.remove('hidden');
+    count.textContent = '(' + r.versions.length + ')';
+    list.innerHTML = '';
+
+    // Live row always first
+    const liveRow = _makeVersionRow(
+      '📡 Live (from Blogger)',
+      _activeVersionTs === 'live',
+      () => restoreLive()
+    );
+    list.appendChild(liveRow);
+
+    r.versions.forEach(v => {
+      const dt = v.ts.replace('T', ' ').replace('Z', ' UTC');
+      const isActive = _activeVersionTs === v.ts;
+      const row = _makeVersionRow('💾 ' + dt, isActive, () => restoreVersion(postId, v.ts));
+      list.appendChild(row);
+    });
+  } catch(e) { panel.classList.add('hidden'); }
+}
+
+function _makeVersionRow(label, isActive, onRestore) {
+  const row = document.createElement('div');
+  row.style.cssText = `display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px;border-radius:5px;border:1px solid ${isActive ? 'var(--accent)' : 'var(--border)'};background:${isActive ? 'var(--warm)' : 'var(--bg)'};`;
+  const lbl = document.createElement('span');
+  lbl.style.cssText = `font-size:0.8rem;color:${isActive ? 'var(--primary)' : 'var(--body-text)'};font-weight:${isActive ? '700' : '400'};`;
+  lbl.textContent = label + (isActive ? ' ✓' : '');
+  const btn = document.createElement('button');
+  btn.className = 'btn btn-outline btn-sm';
+  btn.style.flexShrink = '0';
+  btn.textContent = isActive ? 'Current' : 'Load';
+  btn.disabled = isActive;
+  btn.onclick = onRestore;
+  row.appendChild(lbl);
+  row.appendChild(btn);
+  return row;
+}
+
+function restoreLive() {
+  _activeVersionTs = 'live';
+  document.getElementById('post-html').value = _liveHtml;
+  refreshPostPreview();
+  updateVersionBadge();
+  loadVersions(activePostId);
+  toast('Restored to live version from Blogger', 'success');
+}
+
+async function restoreVersion(postId, ts) {
+  try {
+    const v = await get(`/versions/${postId}/${encodeURIComponent(ts)}`);
+    _activeVersionTs = ts;
+    document.getElementById('post-html').value = v.content;
+    refreshPostPreview();
+    updateVersionBadge();
+    loadVersions(postId);
+    toast('Version loaded — review before saving to Blogger', 'success');
+  } catch(e) {
+    toast('Load failed: ' + e.message, 'error');
+  }
+}
+
+// ═══════════════════════════════════════════
 //  FEED REVIEW
 // ═══════════════════════════════════════════
 let _feedPage = 1;
@@ -2310,6 +2362,30 @@ let _feedHasMore = false;
 let _feedCurrentContent = '';
 let _feedMode = 'preview';
 let _feedInitialized = false;
+
+async function feedUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const statusEl = document.getElementById('feed-upload-status');
+  statusEl.textContent = 'Uploading…';
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const resp = await fetch('/feed/upload', {method: 'POST', body: fd});
+    const r = await resp.json();
+    if (r.error) { statusEl.textContent = '✗ ' + r.error; return; }
+    statusEl.textContent = `✓ Loaded — ${r.count} posts`;
+    // Reset and reload feed
+    _feedInitialized = false;
+    document.getElementById('feed-loading').classList.remove('hidden');
+    document.getElementById('feed-no-file').classList.add('hidden');
+    document.getElementById('feed-ready').classList.add('hidden');
+    initFeed();
+  } catch(e) {
+    statusEl.textContent = '✗ Upload failed';
+  }
+  input.value = '';
+}
 
 async function initFeed() {
   if (_feedInitialized) return;

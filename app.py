@@ -725,6 +725,98 @@ def blogger_bulk_reformat_one():
 
 
 # ---------------------------------------------------------------------------
+# Post Versions — blog_backup/versions/<post_id>.atom
+# ---------------------------------------------------------------------------
+
+VERSIONS_DIR = os.path.join(BASE, 'blog_backup', 'versions')
+
+
+def _versions_file(post_id: str) -> str:
+    return os.path.join(VERSIONS_DIR, f'{post_id}.atom')
+
+
+def _read_versions(post_id: str) -> list:
+    path = _versions_file(post_id)
+    if not os.path.exists(path):
+        return []
+    import xml.etree.ElementTree as ET
+    import html as _html_lib
+    try:
+        tree = ET.parse(path)
+        root = tree.getroot()
+        ns = {'atom': 'http://www.w3.org/2005/Atom'}
+        versions = []
+        for entry in root.findall('atom:entry', ns):
+            id_el = entry.find('atom:id', ns)
+            pub_el = entry.find('atom:published', ns)
+            title_el = entry.find('atom:title', ns)
+            content_el = entry.find('atom:content', ns)
+            versions.append({
+                'ts': pub_el.text if pub_el is not None else '',
+                'title': title_el.text if title_el is not None else '',
+                'content': _html_lib.unescape(content_el.text or '') if content_el is not None else '',
+            })
+        versions.sort(key=lambda v: v['ts'], reverse=True)
+        return versions
+    except Exception:
+        return []
+
+
+def _write_versions(post_id: str, versions: list):
+    import html as _html_lib
+    os.makedirs(VERSIONS_DIR, exist_ok=True)
+    lines = ["<?xml version='1.0' encoding='UTF-8'?>",
+             "<feed xmlns='http://www.w3.org/2005/Atom'>",
+             f"  <id>versions:{post_id}</id>"]
+    for v in versions:
+        escaped = _html_lib.escape(v['content'])
+        lines += [
+            "  <entry>",
+            f"    <title>{_html_lib.escape(v['title'])}</title>",
+            f"    <published>{v['ts']}</published>",
+            f"    <content type='html'>{escaped}</content>",
+            "  </entry>",
+        ]
+    lines.append("</feed>")
+    with open(_versions_file(post_id), 'w', encoding='utf-8') as f:
+        f.write('\n'.join(lines))
+
+
+@app.route('/versions/save', methods=['POST'])
+@login_required
+def versions_save():
+    data = request.get_json() or {}
+    post_id = data.get('post_id', '').strip()
+    title   = data.get('title', '').strip()
+    content = data.get('content', '')
+    if not post_id:
+        return jsonify({'error': 'post_id required'}), 400
+    from datetime import timezone, datetime
+    ts = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+    versions = _read_versions(post_id)
+    versions.insert(0, {'ts': ts, 'title': title, 'content': content})
+    _write_versions(post_id, versions)
+    return jsonify({'success': True, 'ts': ts, 'count': len(versions)})
+
+
+@app.route('/versions/<post_id>')
+@login_required
+def versions_list(post_id):
+    versions = _read_versions(post_id)
+    return jsonify({'versions': [{'ts': v['ts'], 'title': v['title']} for v in versions]})
+
+
+@app.route('/versions/<post_id>/<ts>')
+@login_required
+def versions_get(post_id, ts):
+    versions = _read_versions(post_id)
+    for v in versions:
+        if v['ts'] == ts:
+            return jsonify(v)
+    return jsonify({'error': 'Not found'}), 404
+
+
+# ---------------------------------------------------------------------------
 # Feed Review — blog_backup/feed.atom
 # ---------------------------------------------------------------------------
 
@@ -781,6 +873,23 @@ def _parse_feed():
         p['idx'] = i
     _feed_cache = posts
     return _feed_cache
+
+
+@app.route('/feed/upload', methods=['POST'])
+@login_required
+def feed_upload():
+    global _feed_cache
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+    f = request.files['file']
+    if not f.filename:
+        return jsonify({'error': 'No file selected'}), 400
+    os.makedirs(os.path.dirname(FEED_FILE), exist_ok=True)
+    f.save(FEED_FILE)
+    _feed_cache = None  # bust cache so next request re-parses
+    posts = _parse_feed()
+    years = sorted({p['published'][:4] for p in posts if p['published']}, reverse=True)
+    return jsonify({'success': True, 'count': len(posts), 'years': years})
 
 
 @app.route('/feed/status')

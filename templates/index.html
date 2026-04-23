@@ -144,8 +144,11 @@ textarea:focus, input[type=text]:focus { outline: none; border-color: var(--acce
 .btn-primary:hover { background: #243554; }
 .btn-accent { background: var(--accent); color: var(--primary); }
 .btn-accent:hover { background: #d4b05c; }
+.btn-ai { background: #2563eb; color: white; }
+.btn-ai:hover { background: #1d4ed8; }
 .btn-outline { background: transparent; color: var(--muted); border: 1px solid var(--border); }
 .btn-outline:hover { background: var(--warm); color: var(--body-text); }
+.btn-outline.active { background: var(--warm); color: var(--primary); border-color: var(--primary); }
 .btn-sm { padding: 5px 12px; font-size: 0.74rem; }
 .btn-icon { padding: 6px 8px; }
 
@@ -562,6 +565,11 @@ code {
   .about-table tr { border-bottom: 1px solid var(--border); display: block; padding: 4px 0; }
   .about-table td:first-child { padding-bottom: 2px !important; }
 }
+/* View toggle (HTML / Compose) */
+.view-toggle { display:flex; border:1px solid var(--border); border-radius:6px; overflow:hidden; }
+.view-toggle-btn { padding:4px 13px; font-size:0.78rem; font-weight:700; letter-spacing:0.06em; background:white; color:var(--muted); border:none; cursor:pointer; transition:background 0.12s,color 0.12s; font-family:'Lato',sans-serif; }
+.view-toggle-btn.active { background:var(--primary); color:white; }
+[contenteditable][data-placeholder]:empty::before { content:attr(data-placeholder); color:var(--muted); font-style:italic; pointer-events:none; }
 </style>
 </head>
 <body>
@@ -680,7 +688,10 @@ code {
       <div class="posts-panel">
         <div class="posts-panel-head">
           Posts
-          <button class="btn btn-outline btn-sm btn-icon" onclick="loadPosts()" title="Refresh" style="border-color:rgba(255,255,255,0.3);color:rgba(255,255,255,0.7);padding:3px 7px;">↺</button>
+          <div style="display:flex;gap:5px;">
+            <button class="btn btn-sm" onclick="newPost()" title="New post" style="background:var(--accent);color:var(--primary);font-weight:700;padding:3px 10px;border:none;">New Post</button>
+            <button class="btn btn-outline btn-sm btn-icon" onclick="loadPosts()" title="Refresh" style="border-color:rgba(255,255,255,0.3);color:rgba(255,255,255,0.7);padding:3px 7px;">↺</button>
+          </div>
         </div>
         <!-- Search -->
         <div style="padding:8px 10px;border-bottom:1px solid var(--border);background:var(--warm);">
@@ -710,7 +721,7 @@ code {
           <!-- Title bar -->
           <div class="card" style="padding:14px 18px;">
             <div class="flex gap-2" style="align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;">
-              <h3 id="post-editor-title" style="font-family:'Playfair Display',serif;color:var(--primary);font-size:1.1rem;flex:1;line-height:1.3;"></h3>
+              <h3 id="post-editor-title" contenteditable="true" spellcheck="false" data-placeholder="Post title…" style="font-family:'Playfair Display',serif;color:var(--primary);font-size:1.1rem;flex:1;line-height:1.3;min-width:0;outline:none;cursor:text;border-bottom:1px dashed transparent;transition:border-color 0.15s;" onfocus="this.style.borderBottomColor='var(--accent)'" onblur="this.style.borderBottomColor='transparent'"></h3>
               <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
                 <span id="version-status-badge" style="display:none;font-size:0.72rem;font-weight:700;letter-spacing:0.08em;padding:3px 10px;border-radius:12px;white-space:nowrap;"></span>
                 <a id="post-view-link" href="#" target="_blank" class="btn btn-outline btn-sm">View ↗</a>
@@ -722,11 +733,13 @@ code {
           <!-- Toolbar -->
           <div class="card" style="padding:12px 16px;">
             <div class="editor-toolbar">
-              <button class="btn btn-primary btn-sm" onclick="reformatAndExtract(this)" title="Format post with active theme, extract images, and append them at the end — all in one step">⚡ Reformat + Images</button>
+              <button class="btn btn-ai btn-sm" onclick="reformatAndExtract(this)" title="Format post with active theme, extract images, and append them at the end — all in one step">⚡ AI Reformat + Images</button>
               <button class="btn btn-outline btn-sm" onclick="openThemePopup(event)" id="theme-popup-btn">◑ Format with Theme</button>
+              <button class="btn btn-ai btn-sm" onclick="blogWrite(this)" title="Write or rewrite this post in the Modern Simple Living voice using Gemini">✍ AI Blog Write</button>
               <button class="btn btn-outline btn-sm btn-icon" onclick="toggleGeminiSettings()" title="Gemini API key &amp; model settings">⚙</button>
               <div class="spacer"></div>
-              <button class="btn btn-outline btn-sm" onclick="saveVersion(this)" title="Save a local backup of the current HTML to blog_backup/versions/">💾 Save Version</button>
+              <button id="versions-toggle-btn" class="btn btn-outline btn-sm" onclick="toggleVersionsPanel()" title="Show saved versions">📋 Versions</button>
+              <button id="delete-post-btn" class="btn btn-outline btn-sm" onclick="deletePost(this)" style="color:#c53030;border-color:#c53030;display:none;" title="Permanently delete this post from Blogger">🗑 Delete</button>
               <button class="btn btn-accent btn-sm" onclick="savePost(this)">↑ Save to Blogger</button>
             </div>
           </div>
@@ -735,7 +748,10 @@ code {
           <div id="versions-panel" class="card hidden" style="padding:12px 16px;">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
               <span style="font-size:0.72rem;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);">Saved Versions <span id="versions-count" style="font-weight:400;"></span></span>
-              <button class="btn btn-outline btn-sm" onclick="document.getElementById('versions-panel').classList.add('hidden')" style="padding:2px 9px;">✕</button>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <button class="btn btn-outline btn-sm" onclick="saveVersion(this)" title="Save current HTML as a new version">💾 Save Version</button>
+                <button class="btn btn-outline btn-sm" onclick="toggleVersionsPanel()" style="padding:2px 9px;" title="Close">✕</button>
+              </div>
             </div>
             <div id="versions-list" style="display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto;"></div>
           </div>
@@ -744,9 +760,20 @@ code {
           <div class="card">
             <div class="output-row">
               <label style="margin:0;">Post HTML Content</label>
-              <button class="btn btn-outline btn-sm" onclick="copyText('post-html', this)">⧉ Copy</button>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <div class="view-toggle">
+                  <button id="view-html-btn" class="view-toggle-btn active" onclick="switchPostView('html')">HTML</button>
+                  <button id="view-compose-btn" class="view-toggle-btn" onclick="switchPostView('compose')">Compose</button>
+                </div>
+                <button class="btn btn-outline btn-sm" onclick="copyText('post-html', this)">⧉ Copy</button>
+              </div>
             </div>
-            <textarea id="post-html" rows="14" oninput="refreshPostPreview(); updateVersionBadge();"></textarea>
+            <div id="post-html-card">
+              <textarea id="post-html" rows="14" oninput="refreshPostPreview(); updateVersionBadge();"></textarea>
+            </div>
+            <div id="post-compose-card" class="hidden">
+              <iframe id="post-compose-frame" style="width:100%;height:480px;border:1px solid var(--border);border-radius:5px;background:white;" title="Compose"></iframe>
+            </div>
           </div>
 
           <!-- Post Preview -->
@@ -1217,6 +1244,22 @@ code {
       </div>
       <div id="config-blog-url-status" style="font-size:0.8rem;margin-top:8px;min-height:1.2em;"></div>
     </div>
+
+    <div class="card" style="margin-bottom:18px;">
+      <div style="font-size:0.72rem;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">AI Skills</div>
+      <p style="font-size:0.82rem;color:var(--body-text);margin-bottom:12px;line-height:1.5;">System prompts used by Gemini features. Select a skill to view or edit its instructions.</p>
+      <select id="skills-select" onchange="skillsLoad(this.value)"
+        style="width:100%;padding:8px 10px;font-size:0.85rem;border:1px solid var(--border);border-radius:6px;background:white;color:var(--text);margin-bottom:14px;">
+        <option value="">— select a skill —</option>
+      </select>
+      <div id="skills-editor-wrap" class="hidden">
+        <textarea id="skills-editor" rows="20" style="font-size:0.8rem;font-family:'Courier New',monospace;line-height:1.55;width:100%;"></textarea>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:10px;">
+          <button class="btn btn-primary btn-sm" onclick="skillsSave(this)">Save</button>
+          <span id="skills-save-status" style="font-size:0.8rem;min-height:1.2em;"></span>
+        </div>
+      </div>
+    </div>
   </div>
 </div><!-- /tab-config -->
 
@@ -1366,6 +1409,7 @@ let activeTheme = 'navy_gold';
 let blogId = null;
 let nextPageToken = null;
 let activePostId = null;
+let _isNewPost = false;
 let activeYear = '';
 let activeBlogSearch = '';
 let _liveHtml = '';
@@ -1383,6 +1427,7 @@ function switchTab(name) {
   const idx = btnMap[name];
   if (idx !== undefined) document.querySelectorAll('.tab-btn')[idx].classList.add('active');
   if (name === 'feed') initFeed();
+  if (name === 'config') initSkills();
 }
 
 function toggleUtilDropdown(e) {
@@ -1667,6 +1712,56 @@ async function loadBlogConfig() {
   if (status.connected) await loadBlog();
 }
 
+// ═══════════════════════════════════════════
+//  SKILLS
+// ═══════════════════════════════════════════
+let _skillsInitialized = false;
+let _currentSkill = '';
+
+async function initSkills() {
+  if (_skillsInitialized) return;
+  _skillsInitialized = true;
+  const data = await get('/api/skills/list');
+  const sel = document.getElementById('skills-select');
+  sel.innerHTML = '<option value="">— select a skill —</option>';
+  (data.skills || []).forEach(name => {
+    const opt = document.createElement('option');
+    opt.value = name;
+    opt.textContent = name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    sel.appendChild(opt);
+  });
+}
+
+async function skillsLoad(name) {
+  const wrap = document.getElementById('skills-editor-wrap');
+  if (!name) { wrap.classList.add('hidden'); return; }
+  _currentSkill = name;
+  document.getElementById('skills-save-status').textContent = '';
+  const data = await get(`/api/skills/${name}`);
+  if (data.error) { toast(data.error, 'error'); return; }
+  document.getElementById('skills-editor').value = data.content;
+  wrap.classList.remove('hidden');
+}
+
+async function skillsSave(btn) {
+  if (!_currentSkill) return;
+  const content = document.getElementById('skills-editor').value;
+  setBtnLoading(btn, true);
+  try {
+    const data = await fetchJson(`/api/skills/${_currentSkill}`, 'PUT', {content});
+    const statusEl = document.getElementById('skills-save-status');
+    if (data.success) {
+      statusEl.textContent = '✓ Saved';
+      statusEl.style.color = '#276749';
+      setTimeout(() => { statusEl.textContent = ''; }, 3000);
+    } else {
+      toast('Save failed', 'error');
+    }
+  } finally {
+    setBtnLoading(btn, false);
+  }
+}
+
 async function configSaveBlogUrl(btn) {
   const url = document.getElementById('config-blog-url-input').value.trim();
   if (!url) return;
@@ -1858,6 +1953,9 @@ async function loadPost(postId, el) {
   document.querySelectorAll('.post-item').forEach(i => i.classList.remove('selected'));
   el.classList.add('selected');
   activePostId = postId;
+  _isNewPost = false;
+  document.getElementById('delete-post-btn').style.display = '';
+  switchPostView('html');
   document.getElementById('editor-empty').classList.add('hidden');
   document.getElementById('post-editor').classList.remove('hidden');
   document.getElementById('post-images-card').classList.add('hidden');
@@ -2014,20 +2112,150 @@ async function reformatAndExtract(btn) {
   }
 }
 
-async function savePost(btn) {
-  if (!activePostId || !blogId) return;
+function newPost() {
+  activePostId = null;
+  _isNewPost = true;
+  _liveHtml = '';
+  _activeVersionTs = 'live';
+  document.getElementById('editor-empty').classList.add('hidden');
+  document.getElementById('post-editor').classList.remove('hidden');
+  document.getElementById('post-images-card').classList.add('hidden');
+  document.getElementById('versions-panel').classList.add('hidden');
+  document.getElementById('version-status-badge').style.display = 'none';
+  document.getElementById('delete-post-btn').style.display = 'none';
   const titleEl = document.getElementById('post-editor-title');
-  const title = titleEl.textContent;
-  const content = document.getElementById('post-html').value;
-  const labels = JSON.parse(titleEl.dataset.labels || '[]');
-  if (!confirm(`Save changes to "${title}" on Blogger?`)) return;
+  titleEl.textContent = '';
+  titleEl.dataset.labels = '[]';
+  document.getElementById('post-labels-row').classList.add('hidden');
+  document.getElementById('post-view-link').href = '#';
+  document.getElementById('post-html').value = '';
+  switchPostView('compose');
+}
+
+function switchPostView(mode) {
+  const htmlCard    = document.getElementById('post-html-card');
+  const composeCard = document.getElementById('post-compose-card');
+  const htmlBtn     = document.getElementById('view-html-btn');
+  const composeBtn  = document.getElementById('view-compose-btn');
+  if (mode === 'compose') {
+    const frame = document.getElementById('post-compose-frame');
+    const html  = document.getElementById('post-html').value;
+    frame.contentDocument.open();
+    frame.contentDocument.write(
+      '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>' +
+      'body{font-family:Georgia,serif;font-size:16px;line-height:1.75;padding:24px 32px;' +
+      'max-width:780px;margin:0 auto;color:#333;outline:none;min-height:400px;}' +
+      'img{max-width:100%;height:auto;}' +
+      'h1,h2,h3{font-family:"Playfair Display",Georgia,serif;}' +
+      '</style></head><body>' + (html || '<p><br></p>') + '</body></html>'
+    );
+    frame.contentDocument.close();
+    frame.contentDocument.designMode = 'on';
+    frame.contentDocument.addEventListener('input', () => {
+      document.getElementById('post-html').value = frame.contentDocument.body.innerHTML;
+      updateVersionBadge();
+    });
+    htmlCard.classList.add('hidden');
+    composeCard.classList.remove('hidden');
+    htmlBtn.classList.remove('active');
+    composeBtn.classList.add('active');
+  } else {
+    const frame = document.getElementById('post-compose-frame');
+    if (frame.contentDocument && frame.contentDocument.body)
+      document.getElementById('post-html').value = frame.contentDocument.body.innerHTML;
+    composeCard.classList.add('hidden');
+    htmlCard.classList.remove('hidden');
+    htmlBtn.classList.add('active');
+    composeBtn.classList.remove('active');
+    refreshPostPreview();
+  }
+}
+
+async function blogWrite(btn) {
+  // sync compose → textarea if in compose view
+  if (!document.getElementById('post-compose-card').classList.contains('hidden')) {
+    const frame = document.getElementById('post-compose-frame');
+    if (frame.contentDocument && frame.contentDocument.body)
+      document.getElementById('post-html').value = frame.contentDocument.body.innerHTML;
+  }
+  const text = document.getElementById('post-html').value.trim();
+  if (!text) { toast('Add notes or content first', 'error'); return; }
   setBtnLoading(btn, true);
   try {
-    const data = await fetchJson(`/blogger/post/${activePostId}?blog_id=${blogId}`, 'PUT', {title, content, labels});
-    if (data.success) toast('Post saved successfully!', 'success');
-    else toast('Error: ' + (data.error || 'unknown'), 'error');
+    const data = await post('/api/blog-write', {text});
+    if (data.error === 'no_key') { toast('Set your Gemini API key first (⚙)', 'error'); return; }
+    if (data.error) { toast('Error: ' + data.error, 'error'); return; }
+    document.getElementById('post-html').value = data.content;
+    switchPostView('compose');
+    updateVersionBadge();
+    toast('Blog post written!', 'success');
   } finally {
     setBtnLoading(btn, false);
+  }
+}
+
+async function deletePost(btn) {
+  if (!activePostId || !blogId) return;
+  const title = document.getElementById('post-editor-title').textContent.trim();
+  if (!confirm(`Permanently delete "${title}" from Blogger? This cannot be undone.`)) return;
+  setBtnLoading(btn, true);
+  try {
+    const data = await fetchJson(`/blogger/post/${activePostId}?blog_id=${blogId}`, 'DELETE', null);
+    if (data.success) {
+      toast('Post deleted.', 'success');
+      activePostId = null;
+      document.getElementById('post-editor').classList.add('hidden');
+      document.getElementById('editor-empty').classList.remove('hidden');
+      await loadPosts();
+    } else {
+      toast('Error: ' + (data.error || 'unknown'), 'error');
+    }
+  } finally {
+    setBtnLoading(btn, false);
+  }
+}
+
+async function savePost(btn) {
+  if (!blogId) return;
+  const titleEl = document.getElementById('post-editor-title');
+  const title = titleEl.textContent.trim() || 'Untitled';
+  // sync compose iframe → textarea if compose view is active
+  if (!document.getElementById('post-compose-card').classList.contains('hidden')) {
+    const frame = document.getElementById('post-compose-frame');
+    if (frame.contentDocument && frame.contentDocument.body)
+      document.getElementById('post-html').value = frame.contentDocument.body.innerHTML;
+  }
+  const content = document.getElementById('post-html').value;
+  const labels = JSON.parse(titleEl.dataset.labels || '[]');
+
+  if (_isNewPost) {
+    if (!confirm(`Publish "${title}" to Blogger?`)) return;
+    setBtnLoading(btn, true);
+    try {
+      const data = await fetchJson(`/blogger/post?blog_id=${blogId}`, 'POST', {title, content, labels, draft: false});
+      if (data.success) {
+        toast('Post published!', 'success');
+        _isNewPost = false;
+        activePostId = data.id;
+        document.getElementById('post-view-link').href = data.url || '#';
+        await loadPosts();
+      } else {
+        toast('Error: ' + (data.error || 'unknown'), 'error');
+      }
+    } finally {
+      setBtnLoading(btn, false);
+    }
+  } else {
+    if (!activePostId) return;
+    if (!confirm(`Save changes to "${title}" on Blogger?`)) return;
+    setBtnLoading(btn, true);
+    try {
+      const data = await fetchJson(`/blogger/post/${activePostId}?blog_id=${blogId}`, 'PUT', {title, content, labels});
+      if (data.success) toast('Post saved successfully!', 'success');
+      else toast('Error: ' + (data.error || 'unknown'), 'error');
+    } finally {
+      setBtnLoading(btn, false);
+    }
   }
 }
 
@@ -2145,7 +2373,9 @@ async function post(url, body) {
   return r.json();
 }
 async function fetchJson(url, method, body) {
-  const r = await fetch(url, {method, headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  const opts = {method, headers:{'Content-Type':'application/json'}};
+  if (body !== null && body !== undefined) opts.body = JSON.stringify(body);
+  const r = await fetch(url, opts);
   return r.json();
 }
 
@@ -2639,6 +2869,13 @@ async function saveVersion(btn) {
   }
 }
 
+function toggleVersionsPanel() {
+  const panel = document.getElementById('versions-panel');
+  const btn   = document.getElementById('versions-toggle-btn');
+  const isHidden = panel.classList.toggle('hidden');
+  if (btn) btn.classList.toggle('active', !isHidden);
+}
+
 async function loadVersions(postId) {
   const panel = document.getElementById('versions-panel');
   const list  = document.getElementById('versions-list');
@@ -2646,6 +2883,8 @@ async function loadVersions(postId) {
   try {
     const r = await get('/versions/' + postId);
     panel.classList.remove('hidden');
+    const tb = document.getElementById('versions-toggle-btn');
+    if (tb) tb.classList.add('active');
     count.textContent = '(' + r.versions.length + ')';
     list.innerHTML = '';
 

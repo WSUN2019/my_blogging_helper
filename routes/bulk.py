@@ -4,7 +4,7 @@ from config import login_required
 from blogformat import THEMES, parse_input, render as render_post
 from blogger_client import _get_service
 from html_utils import _html_to_plain, _auto_inject_title
-from gemini_client import GEMINI_PROMPT, _get_gemini_key, _get_gemini_model
+from gemini_client import _get_reformat_prompt, _get_gemini_key, _get_gemini_model
 from img_cleaner import clean_html_string as extract_img_tags
 
 bulk_bp = Blueprint('bulk', __name__)
@@ -38,7 +38,7 @@ def blogger_bulk_reformat_one():
         client = genai.Client(api_key=api_key)
         for _attempt in range(3):
             try:
-                response = client.models.generate_content(model=model_id, contents=GEMINI_PROMPT + plain)
+                response = client.models.generate_content(model=model_id, contents=_get_reformat_prompt() + plain)
                 break
             except Exception as _ge:
                 if '429' in str(_ge) and _attempt < 2:

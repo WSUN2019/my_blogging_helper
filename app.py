@@ -13,6 +13,7 @@ from routes.bulk import bulk_bp
 from routes.versions import versions_bp
 from routes.feed import feed_bp
 from routes.config_routes import config_bp
+from routes.skills import skills_bp
 
 app.register_blueprint(formatter_bp)
 app.register_blueprint(gemini_bp)
@@ -22,6 +23,7 @@ app.register_blueprint(bulk_bp)
 app.register_blueprint(versions_bp)
 app.register_blueprint(feed_bp)
 app.register_blueprint(config_bp)
+app.register_blueprint(skills_bp)
 
 
 @app.route('/login', methods=['GET', 'POST'])

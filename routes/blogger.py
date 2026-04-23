@@ -114,6 +114,28 @@ def blogger_posts():
         return jsonify({'error': str(e)}), 400
 
 
+@blogger_bp.route('/blogger/post', methods=['POST'])
+@login_required
+def blogger_create_post():
+    svc = _get_service()
+    if not svc:
+        return jsonify({'error': 'Not authenticated'}), 401
+    blog_id = request.args.get('blog_id', '')
+    data = request.get_json()
+    title = (data.get('title') or '').strip() or 'Untitled'
+    content = data.get('content', '')
+    labels = data.get('labels', [])
+    is_draft = data.get('draft', False)
+    try:
+        body = {'title': title, 'content': content}
+        if labels:
+            body['labels'] = labels
+        r = svc.posts().insert(blogId=blog_id, body=body, isDraft=is_draft).execute()
+        return jsonify({'success': True, 'id': r['id'], 'url': r.get('url', ''), 'title': r['title']})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+
 @blogger_bp.route('/blogger/post/<post_id>', methods=['GET'])
 @login_required
 def blogger_get_post(post_id):
@@ -146,5 +168,19 @@ def blogger_update_post(post_id):
             body['labels'] = data['labels']
         r = svc.posts().update(blogId=blog_id, postId=post_id, body=body).execute()
         return jsonify({'success': True, 'url': r.get('url', '')})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+
+@blogger_bp.route('/blogger/post/<post_id>', methods=['DELETE'])
+@login_required
+def blogger_delete_post(post_id):
+    svc = _get_service()
+    if not svc:
+        return jsonify({'error': 'Not authenticated'}), 401
+    blog_id = request.args.get('blog_id', '')
+    try:
+        svc.posts().delete(blogId=blog_id, postId=post_id).execute()
+        return jsonify({'success': True})
     except Exception as e:
         return jsonify({'error': str(e)}), 400

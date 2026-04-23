@@ -11,6 +11,7 @@ GEMINI_KEY_FILE   = os.path.join(BASE, 'config', 'gemini_key.txt')
 GEMINI_MODEL_FILE = os.path.join(BASE, 'config', 'gemini_model.txt')
 BLOG_URL_FILE     = os.path.join(BASE, 'config', 'blog_url.txt')
 SAMPLE_FILE       = os.path.join(BASE, 'sample.txt')
+BLOG_SKILLS_FILE  = os.path.join(BASE, 'skills', 'blog_creation_skills.md')
 
 BLOGGER_SCOPES = ['https://www.googleapis.com/auth/blogger']
 
